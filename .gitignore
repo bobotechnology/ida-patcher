@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# tool artifacts (patched binaries / licenses / backups produced at runtime)
+*.bak
+*.hexlic
+*.dll
+*.exe
+
+# OS
+Thumbs.db
+.DS_Store
