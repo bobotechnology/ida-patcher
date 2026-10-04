@@ -4,7 +4,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![platform: Windows](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](#requirements)
-[![version](https://img.shields.io/badge/version-1.1.0-green.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-1.1.1-green.svg)](CHANGELOG.md)
 
 A small, dependency-free Python utility that applies **two 4-byte signature patches** to
 `ida.dll` and drops an `idapro.hexlic` license file next to it. No keygen, no external
@@ -38,7 +38,11 @@ The tool scans `ida.dll` for two byte signatures and rewrites four bytes total:
 | `patch2` | entry of the verify routine | 3 bytes -> `33 C0 C3` (`XOR EAX,EAX; RET`) | Forces the routine to always return 0. |
 
 A `.bak` copy of the original DLL is written before anything is modified, and a compact
-key-sorted `idapro.hexlic` is generated in the same directory. Signatures are
+key-sorted `idapro.hexlic` is generated in the same directory. The license lists the
+**complete** add-on set for the detected build — for IDA 9.5 that is 35 codes (12
+processor modules, 12 Hex-Rays decompilers, `LUMINA`, `TEAMS`, 8 further architectures,
+and `MALWARE`). Add-ons are consulted at runtime, so an incomplete list would leave the
+matching features (for example the non-x86 decompilers) disabled. Signatures are
 version-specific — see [Supported IDA versions](#supported-ida-versions).
 
 ## Requirements

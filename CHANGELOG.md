@@ -5,6 +5,21 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] - 2026-10-04
+
+### Fixed
+
+- The generated `idapro.hexlic` now lists the **complete** add-on set recognized by
+  IDA 9.5 (35 codes: 12 processor modules, 12 Hex-Rays decompilers, `LUMINA`,
+  `TEAMS`, 8 further architectures, and `MALWARE`) instead of a partial subset.
+  Add-ons are consulted at runtime by `has_valid_add_on`, so an incomplete list
+  leaves the corresponding features (e.g. non-x86 decompilers) disabled.
+
+### Added
+
+- Tests asserting the add-on list matches IDA 9.5's enum table exactly (order,
+  uniqueness, and ownership).
+
 ## [1.1.0] - 2026-10-04
 
 ### Added

@@ -12,7 +12,7 @@ import sys, os, struct, json, hashlib, ctypes
 from ctypes import wintypes
 import winreg
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -542,22 +542,43 @@ LIC = {
             "product_id": "IDAPRO",
             "product_version": "9.4",
             "add_ons": [
-                {"id": "48-0000-0000-01", "code": "FEATURE_01", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-02", "code": "FEATURE_02", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-03", "code": "FEATURE_03", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-04", "code": "FEATURE_04", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-05", "code": "FEATURE_05", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-06", "code": "FEATURE_06", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-07", "code": "FEATURE_07", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-08", "code": "FEATURE_08", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-09", "code": "FEATURE_09", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-10", "code": "FEATURE_10", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-11", "code": "FEATURE_11", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-12", "code": "FEATURE_12", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-13", "code": "FEATURE_13", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-14", "code": "FEATURE_14", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-15", "code": "FEATURE_15", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
-                {"id": "48-0000-0000-16", "code": "FEATURE_16", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                # full set of add-on codes recognized by IDA 9.5 (enum name table in ida.dll).
+                # HEX<arch> = disassembler/processor module, HEXC<arch> = Hex-Rays decompiler.
+                {"id": "48-1337-B00B-01", "code": "HEXX86",     "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-02", "code": "HEXX64",     "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-03", "code": "HEXARM",     "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-04", "code": "HEXARM64",   "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-05", "code": "HEXMIPS",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-06", "code": "HEXMIPS64",  "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-07", "code": "HEXPPC",     "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-08", "code": "HEXPPC64",   "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-09", "code": "HEXRV",      "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-10", "code": "HEXRV64",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-11", "code": "HEXARC",     "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-12", "code": "HEXARC64",   "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-13", "code": "HEXCX86",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-14", "code": "HEXCX64",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-15", "code": "HEXCARM",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-16", "code": "HEXCARM64",  "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-17", "code": "HEXCMIPS",   "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-18", "code": "HEXCMIPS64", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-19", "code": "HEXCARC",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-20", "code": "HEXCARC64",  "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-21", "code": "HEXCRV",     "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-22", "code": "HEXCRV64",   "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-23", "code": "HEXCPPC",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-24", "code": "HEXCPPC64",  "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-25", "code": "LUMINA",     "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-26", "code": "TEAMS",      "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-27", "code": "HEXV850",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-28", "code": "HEXCV850",   "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-29", "code": "HEXDALVIK",  "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-30", "code": "HEXCDALVIK", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-31", "code": "HEXTRICORE", "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-32", "code": "HEXCTRICORE","owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-33", "code": "HEXQDSP6",   "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-34", "code": "HEXCQDSP6",  "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
+                {"id": "48-1337-B00B-35", "code": "MALWARE",    "owner": "14-0000-FFFF-88", "start_date": "2025-07-20 00:00:00", "end_date": "2033-12-31 23:59:59"},
             ],
             "features": [],
         }],

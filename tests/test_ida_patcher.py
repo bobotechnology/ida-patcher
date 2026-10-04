@@ -100,13 +100,37 @@ def test_sort_json_nested_list():
 # ------------------------------------------------------------ metadata
 
 def test_version_defined():
-    assert patcher.__version__ == "1.1.0"
+    assert patcher.__version__ == "1.1.1"
 
 
-def test_license_blob_is_neutralized():
+def test_license_blob_has_no_vendor_domain():
     blob = patcher.sort_json(patcher.LIC).lower()
     assert patcher.LIC["payload"]["email"] == "user@example.com"
     assert "hex-rays" not in blob
+
+
+# the complete add-on enum recognized by IDA 9.5, in ida.dll declaration order
+IDA95_ADDON_CODES = [
+    "HEXX86", "HEXX64", "HEXARM", "HEXARM64", "HEXMIPS", "HEXMIPS64",
+    "HEXPPC", "HEXPPC64", "HEXRV", "HEXRV64", "HEXARC", "HEXARC64",
+    "HEXCX86", "HEXCX64", "HEXCARM", "HEXCARM64", "HEXCMIPS", "HEXCMIPS64",
+    "HEXCARC", "HEXCARC64", "HEXCRV", "HEXCRV64", "HEXCPPC", "HEXCPPC64",
+    "LUMINA", "TEAMS", "HEXV850", "HEXCV850", "HEXDALVIK", "HEXCDALVIK",
+    "HEXTRICORE", "HEXCTRICORE", "HEXQDSP6", "HEXCQDSP6", "MALWARE",
+]
+
+
+def test_license_add_ons_are_complete():
+    codes = [a["code"] for a in patcher.LIC["payload"]["licenses"][0]["add_ons"]]
+    assert codes == IDA95_ADDON_CODES
+    assert len(codes) == 35
+
+
+def test_license_add_on_ids_unique_and_owned():
+    lic = patcher.LIC["payload"]["licenses"][0]
+    ids = [a["id"] for a in lic["add_ons"]]
+    assert len(ids) == len(set(ids))
+    assert all(a["owner"] == lic["id"] for a in lic["add_ons"])
 
 
 # -------------------------------------------------------------- patch1
