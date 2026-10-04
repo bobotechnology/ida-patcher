@@ -27,7 +27,9 @@ except ImportError:  # winreg is unavailable off Windows
 
 
 PATCH1_SPEC = "48 8B 4D ?? 48 85 C9 74 05 E8 ?? ?? ?? ?? BE 0A 00 00 00"
+PATCH1_95_SPEC = "48 8B 4D ?? 48 85 C9 74 05 E8 ?? ?? ?? ?? 41 BE 0A 00 00 00"
 PATCH2_SIG = bytes.fromhex("41 89 45 00 85 F6 74")
+PATCH2_95_SIG = bytes.fromhex("41 89 45 00 45 85 F6 74")
 
 
 # ---------------------------------------------------------------- sig()
@@ -63,20 +65,26 @@ def test_search_returns_all_offsets():
     assert patcher.search(b"\x00\x01\x00\x01", b"\x00\x01") == [0, 2]
 
 
-# --------------------------------------------------------- search_one()
+# ------------------------------------------------------------- locate()
 
-def test_search_one_returns_single_offset():
-    assert patcher.search_one(b"\x00\x01", b"\x01", label="t") == 1
+def test_locate_returns_offset_for_unique_match():
+    off, spec = patcher.locate(b"\x00\x01", ["01"], label="t")
+    assert (off, spec) == (1, "01")
 
 
-def test_search_one_exits_when_missing():
+def test_locate_tries_specs_in_order():
+    off, spec = patcher.locate(b"\x00\x01", ["FF", "01"], label="t")
+    assert (off, spec) == (1, "01")
+
+
+def test_locate_exits_when_nothing_matches():
     with pytest.raises(SystemExit):
-        patcher.search_one(b"\x00", b"\xFF", label="t")
+        patcher.locate(b"\x00", ["FF"], label="t")
 
 
-def test_search_one_exits_on_multiple_matches():
+def test_locate_exits_on_ambiguous_match():
     with pytest.raises(SystemExit):
-        patcher.search_one(b"\x01\x01", b"\x01", label="t")
+        patcher.locate(b"\x01\x01", ["01"], label="t")
 
 
 # ----------------------------------------------------------- sort_json()
@@ -92,7 +100,7 @@ def test_sort_json_nested_list():
 # ------------------------------------------------------------ metadata
 
 def test_version_defined():
-    assert patcher.__version__ == "1.0.0"
+    assert patcher.__version__ == "1.1.0"
 
 
 def test_license_blob_is_neutralized():
@@ -106,15 +114,17 @@ def test_license_blob_is_neutralized():
 def test_patch1_flips_jnz_to_jmp():
     p, m = patcher.sig(PATCH1_SPEC)
     data = bytearray(b"\x75\x90") + bytearray(p)
-    offset = patcher.patch1(data)
+    offset, spec = patcher.patch1(data)
     assert offset == 0
+    assert spec == PATCH1_SPEC
     assert data[0] == 0xEB
 
 
 def test_patch1_is_idempotent():
     p, m = patcher.sig(PATCH1_SPEC)
     data = bytearray(b"\xEB\x90") + bytearray(p)
-    assert patcher.patch1(data) == 0
+    offset, spec = patcher.patch1(data)
+    assert offset == 0
     assert data[0] == 0xEB
 
 
@@ -129,17 +139,73 @@ def test_patch1_rejects_unexpected_byte():
 
 def test_patch2_redirects_call_target():
     data = bytearray(b"\xE8\x05\x00\x00\x00" + PATCH2_SIG + b"\x11\x22\x33")
-    offset = patcher.patch2(data)
+    offset, spec = patcher.patch2(data)
     assert offset == 10
     assert bytes(data[10:13]) == bytes([0x33, 0xC0, 0xC3])
 
 
 def test_patch2_is_idempotent():
     data = bytearray(b"\xE8\x05\x00\x00\x00" + PATCH2_SIG + bytes([0x33, 0xC0, 0xC3]))
-    assert patcher.patch2(data) == 10
+    offset, _ = patcher.patch2(data)
+    assert offset == 10
 
 
 def test_patch2_rejects_non_call():
     data = bytearray(b"\x90\x05\x00\x00\x00" + PATCH2_SIG + b"\x11\x22\x33")
     with pytest.raises(SystemExit):
         patcher.patch2(data)
+
+
+# ---------------------------------------------------- IDA 9.5 signatures
+
+def test_locate_picks_95_patch1_signature():
+    p, _ = patcher.sig(PATCH1_95_SPEC)
+    off, spec = patcher.locate(bytes(p), patcher.PATCH1_SIGS, "patch1")
+    assert off == 0
+    assert spec == PATCH1_95_SPEC
+
+
+def test_patch1_95_flips_jnz_to_jmp():
+    p, _ = patcher.sig(PATCH1_95_SPEC)
+    data = bytearray(b"\x75\x90") + bytearray(p)
+    offset, spec = patcher.patch1(data)
+    assert offset == 0
+    assert spec == PATCH1_95_SPEC
+    assert data[0] == 0xEB
+
+
+def test_locate_picks_95_patch2_signature():
+    data = bytearray(b"\xE8\x05\x00\x00\x00" + PATCH2_95_SIG + b"\x11\x22\x33")
+    off, spec = patcher.locate(bytes(data), patcher.PATCH2_SIGS, "patch2")
+    assert off == 5
+    assert spec == "41 89 45 00 45 85 F6 74"
+
+
+def test_patch2_95_redirects_call_target():
+    data = bytearray(b"\xE8\x05\x00\x00\x00" + PATCH2_95_SIG + b"\x11\x22\x33")
+    offset, _ = patcher.patch2(data)
+    assert offset == 10
+    assert bytes(data[10:13]) == bytes([0x33, 0xC0, 0xC3])
+
+
+def test_sig_version_mapping():
+    assert patcher.SIG_VERSION[PATCH1_SPEC] == "9.4"
+    assert patcher.SIG_VERSION[PATCH1_95_SPEC] == "9.5"
+    assert patcher.SIG_VERSION["41 89 45 00 85 F6 74"] == "9.4"
+    assert patcher.SIG_VERSION["41 89 45 00 45 85 F6 74"] == "9.5"
+
+
+# --------------------------------------------------- install discovery
+
+def test_has_ida_returns_dir_when_exe_present(tmp_path):
+    (tmp_path / "ida.exe").write_bytes(b"stub")
+    assert patcher._has_ida(str(tmp_path)) == str(tmp_path)
+
+
+def test_has_ida_returns_none_when_exe_missing(tmp_path):
+    assert patcher._has_ida(str(tmp_path)) is None
+
+
+def test_has_ida_returns_none_for_falsy_input():
+    assert patcher._has_ida("") is None
+    assert patcher._has_ida(None) is None

@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-04
+
+### Added
+
+- Support for **IDA 9.5 (x64)** in addition to IDA 9.4. `patch1`/`patch2` now use a
+  version-aware signature set and apply whichever set matches exactly once.
+- `locate()` helper that selects the unique matching signature from a set of candidates.
+- The detected IDA version is written to `product_version` in the generated
+  `idapro.hexlic` and printed on completion.
+- Unit tests for install discovery (`_has_ida`) and for the version mapping
+  (`SIG_VERSION`).
+- README section documenting the supported IDA builds and how to add a new one.
+
+### Changed
+
+- `search()` now anchors on the longest run of fixed bytes and uses `bytes.find`, so
+  scanning a multi-megabyte `ida.dll` completes in well under a second.
+- `search_one()` was replaced by `locate()`.
+
 ## [1.0.0] - 2026-10-04
 
 ### Added

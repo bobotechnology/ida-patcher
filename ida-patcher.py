@@ -12,7 +12,7 @@ import sys, os, struct, json, hashlib, ctypes
 from ctypes import wintypes
 import winreg
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -343,33 +343,70 @@ def find_ida_dir():
 # ----------------------------------------------------------------
 
 def search(data, pat, mask=None):
-    """return all offsets where pat matches (0xFF=match, 0x00=wildcard)"""
+    """return all offsets where pat matches (0xFF=match, 0x00=wildcard)
+
+    Anchors on the longest run of fixed bytes and uses bytes.find so a full
+    scan of a multi-megabyte DLL stays fast."""
     if mask is None:
         mask = b'\xFF' * len(pat)
+    n = len(pat)
     hits = []
-    for off in range(len(data) - len(pat) + 1):
-        for i in range(len(pat)):
-            if mask[i] and data[off + i] != pat[i]:
-                break
+
+    anchor_start = anchor_len = run = 0
+    for i, m in enumerate(mask):
+        if m:
+            run += 1
+            if run > anchor_len:
+                anchor_len = run
+                anchor_start = i - run + 1
         else:
-            hits.append(off)
+            run = 0
+    if anchor_len == 0:
+        return list(range(len(data) - n + 1))
+
+    anchor = bytes(pat[anchor_start:anchor_start + anchor_len])
+    off = data.find(anchor)
+    while off != -1:
+        cand = off - anchor_start
+        if cand >= 0:
+            for i in range(n):
+                if mask[i] and data[cand + i] != pat[i]:
+                    break
+            else:
+                hits.append(cand)
+        off = data.find(anchor, off + 1)
     return hits
 
 
-def search_one(data, pat, mask=None, label=""):
-    """exactly one match or die"""
-    hits = search(data, pat, mask)
-    if not hits:
-        print(f"[!] {label}: pattern not found — incompatible version?")
-        sys.exit(1)
-    if len(hits) > 1:
+def locate(data, specs, label=""):
+    """Return (offset, spec) for the first spec that matches exactly once.
+
+    Each spec is tried in order; this is what makes the patcher version
+    aware (e.g. IDA 9.4 vs 9.5). Dies if nothing matches, or if the only
+    matching spec is ambiguous."""
+    ambiguous = None
+    for spec in specs:
+        p, m = sig(spec)
+        hits = search(data, p, m)
+        if len(hits) == 1:
+            return hits[0], spec
+        if len(hits) > 1 and ambiguous is None:
+            ambiguous = (spec, hits)
+
+    if ambiguous:
+        spec, hits = ambiguous
         print(f"[!] {label}: got {len(hits)} matches, expected 1")
+        print(f"    spec: {spec}")
         for h in hits[:5]:
             print(f"    @ {h:X}: {data[h:h+24].hex(' ').upper()}")
         if len(hits) > 5:
             print(f"    ... {len(hits)-5} more")
         sys.exit(1)
-    return hits[0]
+
+    print(f"[!] {label}: no known signature matched — unsupported IDA build?")
+    for spec in specs:
+        print(f"    tried: {spec}")
+    sys.exit(1)
 
 
 def sig(spec):
@@ -384,37 +421,55 @@ def sig(spec):
     return bytes(pat), bytes(msk)
 
 # ----------------------------------------------------------------
-# the two patches
+# the two patches (version-aware signature sets)
 # ----------------------------------------------------------------
 
-def patch1(data):
-    """JNZ -> JMP so we skip the ESI=0xA error code after failed verify"""
+# patch1: the branch taken right after a failed license verify, immediately
+# before the "error = 0xA" assignment. We flip its JNZ to JMP.
+PATCH1_SIGS = [
+    # IDA 9.4 (x64):  ... call <free> ; mov esi, 0xA
+    "48 8B 4D ?? 48 85 C9 74 05 E8 ?? ?? ?? ?? BE 0A 00 00 00",
+    # IDA 9.5 (x64):  ... call <free> ; mov r14d, 0xA
+    "48 8B 4D ?? 48 85 C9 74 05 E8 ?? ?? ?? ?? 41 BE 0A 00 00 00",
+]
 
-    p, m = sig(
-        "48 8B 4D ?? "
-        "48 85 C9 "
-        "74 05 "
-        "E8 ?? ?? ?? ?? "
-        "BE 0A 00 00 00")
-    hit = search_one(data, p, m, "patch1")
+# patch2: a CALL whose result is stored and then tested against the error
+# register (esi on 9.4, r14d on 9.5). We rewrite the callee to XOR EAX,EAX;RET.
+PATCH2_SIGS = [
+    # IDA 9.4 (x64):  mov [r13],eax ; test esi,esi ; jz
+    "41 89 45 00 85 F6 74",
+    # IDA 9.5 (x64):  mov [r13],eax ; test r14d,r14d ; jz
+    "41 89 45 00 45 85 F6 74",
+]
+
+# maps a matched signature back to the IDA version it belongs to
+SIG_VERSION = {
+    PATCH1_SIGS[0]: "9.4", PATCH1_SIGS[1]: "9.5",
+    PATCH2_SIGS[0]: "9.4", PATCH2_SIGS[1]: "9.5",
+}
+
+
+def patch1(data):
+    """JNZ -> JMP so the failed-verify error path is never taken"""
+
+    hit, spec = locate(data, PATCH1_SIGS, "patch1")
     jnz = hit - 2
 
     if data[jnz] == 0xEB:
         print(f"  [OK] patch1 @ {jnz:X}: already EB")
-        return jnz
+        return jnz, spec
     if data[jnz] != 0x75:
         print(f"[!] patch1: expected 0x75 at {jnz:X}, got {data[jnz]:02X}")
         sys.exit(1)
     data[jnz] = 0xEB
     print(f"  [OK] patch1 @ {jnz:X}: 75 -> EB")
-    return jnz
+    return jnz, spec
 
 
 def patch2(data):
-    """patch FUN_1006705f0 entry to XOR EAX,EAX; RET (return 0 always)"""
+    """patch the verify function entry to XOR EAX,EAX; RET (return 0 always)"""
 
-    p = bytes.fromhex("41 89 45 00 85 F6 74")  # MOV [R13],EAX; TEST ESI,ESI; JZ
-    hit = search_one(data, p, label="patch2")
+    hit, spec = locate(data, PATCH2_SIGS, "patch2")
     call = hit - 5
 
     if data[call] != 0xE8:
@@ -431,12 +486,12 @@ def patch2(data):
     orig = data[target:target+3]
     if orig == bytes([0x33, 0xC0, 0xC3]):
         print(f"  [OK] patch2 @ {target:X}: already 33 C0 C3")
-        return target
+        return target, spec
 
     data[target:target+3] = bytes([0x33, 0xC0, 0xC3])
     print(f"  [OK] patch2 @ {target:X}: "
           f"{' '.join(f'{b:02X}' for b in orig)} -> 33 C0 C3  (CALL @ {call:X}, rel={rel:#x})")
-    return target
+    return target, spec
 
 
 def patch_dll(path):
@@ -445,10 +500,15 @@ def patch_dll(path):
         data = bytearray(f.read())
     print(f"    {len(data):,} bytes\n")
 
-    o1 = patch1(data)
-    o2 = patch2(data)
-    print(f"\n[*] done: 2 patches ({o1}, {o2}), 4 bytes total")
-    return data, [o1, o2]
+    o1, s1 = patch1(data)
+    o2, s2 = patch2(data)
+
+    version = SIG_VERSION.get(s1) or SIG_VERSION.get(s2)
+    if version:
+        LIC["payload"]["licenses"][0]["product_version"] = version
+
+    print(f"\n[*] done: 2 patches ({o1}, {o2}), 4 bytes total, IDA {version}")
+    return data, [o1, o2], version
 
 # ----------------------------------------------------------------
 # hexlic boilerplate
@@ -607,7 +667,7 @@ def main():
     else:
         print(f"[*] backup already exists: {bak}")
 
-    data, _ = patch_dll(dll)
+    data, _, detected = patch_dll(dll)
 
     print(f"\n[*] writing patched dll -> {dll}")
     with open(dll, "wb") as f:
@@ -623,6 +683,7 @@ def main():
     print(f"""
 {'='*60}
  install : {d}
+ ida     : {detected or 'unknown'}
  original SHA256: {oh}...
  patched  SHA256: {ph}...
 

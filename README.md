@@ -4,7 +4,7 @@
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![platform: Windows](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](#requirements)
-[![version](https://img.shields.io/badge/version-1.0.0-green.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-1.1.0-green.svg)](CHANGELOG.md)
 
 A small, dependency-free Python utility that applies **two 4-byte signature patches** to
 `ida.dll` and drops an `idapro.hexlic` license file next to it. No keygen, no external
@@ -21,6 +21,7 @@ tooling — locate, elevate, patch, done.
 - [Output](#output)
 - [Restore (unpatch)](#restore-unpatch)
 - [How IDA is located](#how-ida-is-located)
+- [Supported IDA versions](#supported-ida-versions)
 - [Development](#development)
 - [Disclaimer](#disclaimer)
 - [Contributing](#contributing)
@@ -33,14 +34,12 @@ The tool scans `ida.dll` for two byte signatures and rewrites four bytes total:
 
 | Patch | Location | Change | Purpose |
 |-------|----------|--------|---------|
-| `patch1` | branch after a failed verify call | `75` (`JNZ`) -> `EB` (`JMP`) | Skips the `ESI=0xA` error path. |
+| `patch1` | branch after a failed verify call | `75` (`JNZ`) -> `EB` (`JMP`) | Skips the error path (`error = 0xA`). |
 | `patch2` | entry of the verify routine | 3 bytes -> `33 C0 C3` (`XOR EAX,EAX; RET`) | Forces the routine to always return 0. |
 
 A `.bak` copy of the original DLL is written before anything is modified, and a compact
-key-sorted `idapro.hexlic` is generated in the same directory.
-
-> Signatures are version-specific. Verified against **IDA 9.4 (x64)**. On other builds the
-> pattern search fails loudly with a single, unambiguous error instead of a partial patch.
+key-sorted `idapro.hexlic` is generated in the same directory. Signatures are
+version-specific — see [Supported IDA versions](#supported-ida-versions).
 
 ## Requirements
 
@@ -131,6 +130,31 @@ Discovery runs in order, and stops at the first hit:
    resolved with `pywin32` when available.
 
 If all methods fail, pass the DLL path explicitly — see [Usage](#usage).
+
+## Supported IDA versions
+
+The patcher carries one signature set per supported build and applies whichever set
+matches **exactly once**. The detected build is written into the generated
+`idapro.hexlic` (`product_version`) and printed on completion.
+
+| IDA build | Status | `patch1` | `patch2` |
+|-----------|--------|----------|----------|
+| 9.4 (x64) | verified | `... E8 ?? ?? ?? ?? BE 0A 00 00 00` (`mov esi, 0xA`) | `41 89 45 00 85 F6 74` (`test esi, esi`) |
+| 9.5 (x64) | verified | `... E8 ?? ?? ?? ?? 41 BE 0A 00 00 00` (`mov r14d, 0xA`) | `41 89 45 00 45 85 F6 74` (`test r14d, r14d`) |
+
+The two builds differ only in the register holding the error code (`esi` -> `r14d`); the
+patch logic is identical. On an unsupported build the tool aborts with
+`no known signature matched` instead of applying a partial patch.
+
+### Adding support for a new build
+
+1. Open `ida.dll` in a disassembler (IDA, radare2, ...) and locate the license-verify
+   routine: the failure path assigns an error code and the successful path returns 0.
+2. Capture the bytes around both patch sites (the failed-verify branch and the
+   `CALL` whose result is tested against the error register).
+3. Append the two new patterns to `PATCH1_SIGS` / `PATCH2_SIGS` in
+   [ida-patcher.py](ida-patcher.py) and add their versions to `SIG_VERSION`.
+4. Add a test under `tests/` and state the exact IDA build in your pull request.
 
 ## Development
 
